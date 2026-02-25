@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════════════════════════
+# 🚨 SECURITY - Never commit sensitive data! 🚨
+# ═══════════════════════════════════════════════════════════════
+
+# Credentials and secrets
+.env/
+*.env
+secrets.*
+secrets.env
+*.key
+*.pem
+credentials.*
+
+# Private keys and tokens
+*.token
+*token.json
+auth.json
+
+# Logs (may contain sensitive info)
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Backup files (may contain credentials)
+*.backup
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# ═══════════════════════════════════════════════════════════════
+.secrets/

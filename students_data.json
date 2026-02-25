@@ -1,0 +1,14 @@
+{
+  "students": [
+    {
+      "name": "Child1_Name",
+      "username": "student_username_1",
+      "password": "student_password_1"
+    },
+    {
+      "name": "Child2_Name", 
+      "username": "student_username_2",
+      "password": "student_password_2"
+    }
+  ]
+}

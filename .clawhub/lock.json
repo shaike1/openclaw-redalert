@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "homeassistant-skill": {
+      "version": "2.1.0",
+      "installedAt": 1771743311487
+    },
+    "google-calendar-api": {
+      "version": "1.0.5",
+      "installedAt": 1771750764692
+    },
+    "gogcli": {
+      "version": "1.0.0",
+      "installedAt": 1771750782247
+    }
+  }
+}

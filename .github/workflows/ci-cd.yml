@@ -1,0 +1,129 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.7, 3.8, 3.9, '3.10']
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip3 install -r requirements.txt
+        python3 -m playwright install
+    
+    - name: Lint with flake8
+      run: |
+        pip3 install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Format check with black
+      run: |
+        pip3 install black
+        black --check --diff .
+    
+    - name: Test basic functionality
+      run: |
+        python3 -c "import webtop; print('Webtop module imported successfully')"
+        python3 -c "import calendar_integration; print('Calendar integration imported successfully')"
+        python3 -c "import homework_to_group; print('WhatsApp integration imported successfully')"
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run security scan
+      uses: PyCQA/bandit-action@v1.6.1
+      with:
+        path: '.'
+        config: 'bandit.ini'
+    
+    - name: Check for secrets
+      run: |
+        pip3 install detect-secrets
+        detect-secrets scan --baseline .secrets.baseline
+        detect-secrets audit --baseline .secrets.baseline
+
+  deploy-to-clawdhub:
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup skill package
+      run: |
+        mkdir -p dist
+        cp -r *.py SKILL.md requirements.txt setup.sh README.md dist/
+        cp -r students_data.json dist/
+        cp -r calendar dist/
+        cd dist
+    
+    - name: Create package archive
+      run: |
+        tar -czf webtop-skill.tar.gz .
+        echo "::set-output name=archive_name::webtop-skill.tar.gz"
+    
+    - name: Upload to ClawdHub
+      uses: clawdbot/upload-skill@v1
+      with:
+        skill-name: webtop-skill
+        skill-archive: webtop-skill.tar.gz
+        skill-version: ${{ github.release.tag_name }}
+
+  deploy-to-github:
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ github.run_number }}
+        name: Webtop Skill Release v${{ github.run_number }}
+        body: |
+          Automated release of Webtop Homework Skill
+          
+          Features:
+          - Google Calendar integration
+          - WhatsApp messaging
+          - Automated homework monitoring
+          - Evening event cleanup
+          
+          ## Installation
+          1. Download the skill archive
+          2. Run `setup.sh` to install dependencies
+          3. Configure credentials in .env file
+          4. Test with `python3 webtop.py homework <username> <password>`
+          
+          ## Documentation
+          See SKILL.md for complete documentation.
+        files: |
+          webtop-skill.tar.gz
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

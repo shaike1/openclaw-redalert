@@ -1,0 +1,85 @@
+{
+  "family_calendar": {
+    "calendar_id": "your_family_calendar_id_here@group.v.calendar.google.com",
+    "calendar_name": "Family",
+    "access_role": "owner",
+    "sync_settings": {
+      "enabled": true,
+      "auto_sync": true,
+      "sync_interval": 3600,
+      "cleanup_evening_events": true,
+      "evening_hour": 18
+    }
+  },
+  "personal_calendars": {
+    "parent": {
+      "calendar_id": "your_email@gmail.com",
+      "calendar_name": "Personal",
+      "access_role": "owner",
+      "sync_settings": {
+        "enabled": true,
+        "auto_sync": false,
+        "cleanup_evening_events": true,
+        "evening_hour": 20
+      }
+    }
+  },
+  "family_members": [
+    {
+      "name": "Child1_Name",
+      "username": "student_username_1",
+      "password": "student_password_1",
+      "calendar_color": "#FF6B6B",
+      "sync_homework": true
+    },
+    {
+      "name": "Child2_Name",
+      "username": "student_username_2",
+      "password": "student_password_2",
+      "calendar_color": "#4ECDC4",
+      "sync_homework": true
+    }
+  ],
+  "event_types": {
+    "homework": {
+      "calendar": "Family",
+      "color": "#FFA726",
+      "notifications": true,
+      "reminders": [
+        {"minutes": 1440},
+        {"minutes": 60}
+      ]
+    },
+    "family_event": {
+      "calendar": "Family",
+      "color": "#AB47BC",
+      "notifications": true,
+      "reminders": [
+        {"minutes": 1440}
+      ]
+    },
+    "personal": {
+      "calendar": "Personal",
+      "color": "#66BB6A",
+      "notifications": true,
+      "reminders": []
+    }
+  },
+  "automation_settings": {
+    "daily_summary": {
+      "enabled": true,
+      "time": "18:00",
+      "send_to_whatsapp": true
+    },
+    "weekly_summary": {
+      "enabled": false,
+      "day": "Sunday",
+      "time": "20:00"
+    },
+    "event_cleanup": {
+      "enabled": true,
+      "time": "19:00",
+      "delete_evening_events": true
+    }
+  }
+}

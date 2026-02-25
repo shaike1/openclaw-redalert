@@ -1,22 +1,27 @@
 # MEMORY.md - Luky Bot Memory
 
 ## Latest Updates
+- **2026-02-25**: OpenClaw upgraded to v2026.2.23 ✅
+  - Cleaned up duplicate Webtop skills
+  - Kept only: pywebtop-skill (working)
+  - Removed: webtop-homework, webtop-skill, webtop-script (outdated)
+
+- **2026-02-24**: Webtop automation working ✅
+  - Daily homework fetching at 6:00 AM
+  - WhatsApp group: 120363417492964228@g.us
+  - Children: Yuval (2-5), Shira (4-3)
+
 - **2026-02-22**: Automated backup system installed
   - Daily backups at 3am UTC
   - Local: `/root/openclaw-backups/`
   - 7-day retention + weekly backups
   - Backup script: `/root/.openclaw/backup/backup-local.sh`
 
-- **2026-02-22**: Bot configuration restored after troubleshooting
+- **2026-02-22**: Bot configuration restored
   - Identity: Luky Bot (לוקי בוט)
-  - 47 skills installed (google-speech, home-assistant-manager, model-router, etc.)
+  - Skills installed (after cleanup): ~44 skills
   - WhatsApp: +972527497367
   - Group "בוטים": 120363425850729867@g.us (no @mention needed)
-
-- **2026-02-22**: Model configuration updated
-  - Primary: zai/glm-4.7 (Z.ai GLM 4.7)
-  - API: anthropic-messages
-  - Provider: Z.ai
 
 ---
 
@@ -25,6 +30,27 @@
 - **Home Assistant**: https://ha.right-api.com (token configured)
 - **Spotify**: OAuth configured
 - **Discord**: @luky
+
+---
+
+## 🔐 Secure Credentials Location
+
+**ALL credentials stored in:** `/root/.openclaw/workspace/.env/secrets.env`
+- 🔒 **Permissions:** 600 (owner read/write only)
+- 🔒 **Directory:** 700 (owner access only)
+- ✅ **Secured with proper permissions**
+
+### 📚 Webtop Credentials (SmartSchool)
+**Parent Account:** שי שמעון לוקוב
+- **Username:** USXD88
+- **Password:** usx88usx88
+- **Data Key:** makhVV2GVc7e99mbVW16PQ==
+- **School:** נעמי שמר
+- **Children:** יובל (2-5), שירה (4-3)
+
+**Working Script:** `/root/.openclaw/skills/pywebtop-skill/webtop_homework_fetcher.py`
+**Status:** ✅ Tested and working (2026-02-25)
+**Method:** API direct (NOT Playwright - avoids CAPTCHA)
 
 ---
 

@@ -16,21 +16,6 @@ ts="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 issues=()
 fixed=()
 
-check_gateway() {
-  if ! openclaw gateway probe >/dev/null 2>&1; then
-    issues+=("Gateway probe failed")
-    # Try self-heal (non-fatal)
-    if pkill -f openclaw-gateway >/dev/null 2>&1 || true; then :; fi
-    nohup openclaw gateway run --bind tailnet --port 18789 >/tmp/openclaw-gateway-manual.log 2>&1 &
-    sleep 2
-    if openclaw gateway probe >/dev/null 2>&1; then
-      fixed+=("Gateway restarted")
-      # remove last issue if healed
-      unset 'issues[${#issues[@]}-1]'
-    fi
-  fi
-}
-
 check_container() {
   local name="$1"
   if ! docker ps --format '{{.Names}}' | grep -qx "$name"; then
@@ -42,7 +27,6 @@ check_container() {
   fi
 }
 
-check_gateway
 for c in 3cx-sbc drachtio freeswitch voice-app claude-api-server; do
   check_container "$c"
 done

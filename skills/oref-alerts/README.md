@@ -1,206 +1,230 @@
-# 🚨 ORef Alerts - OpenClaw Integration
-## מערכת התרעות פיקוד העורף - אינטגרציית OpenClaw
+# 🚨 ORef Alerts Monitor - פיקוד העורף
 
-> מערכת עצמאית לקבלת התרעות אדומות מפיקוד העורף  
-> **אין תלות ב-Home Assistant** — עובד לבד דרך OpenClaw
+מערכת התרעות חכמה לפיקוד העורף - מנוטרת לפי אזורים, ללא כפילויות, עם WhatsApp + HA TTS.
 
 ---
 
-## 🏗️ ארכיטקטורה
+## ארכיטקטורה
 
 ```
-📡 Pikud Ha-Oref API (כל 5 שניות)
-              ↓
-    🖥️ OpenClaw VPS (ליבה)
-              ↓
-   ┌──────────┼─────────────┐
-   │          │             │
-📱 WhatsApp  🔊 TTS קולי  📞 חיוג
-  (תמיד)    (אם HA מוגדר) (3CX, אופציונלי)
+Pikud Ha-Oref API (oref.org.il)
+        ↓
+Docker: dmatik/oref-alerts  (:49000)
+        ↓
+Docker: oref-monitor (Python)
+        ↓  ↓  ↓
+   📱 WA  🔊 TTS  💡 Lights
 ```
 
----
-
-## 📦 מה כלול
-
-| קובץ | תיאור |
-|------|-------|
-| `monitor.py` | סקריפט הניטור הראשי |
-| `scripts/deploy.sh` | סקריפט דיפלוי אינטראקטיבי |
-| `docker-compose.yml` | Docker Compose לcontainer פיקוד העורף |
-| `.env.example` | קובץ הגדרות לדוגמה |
-| `references/api.md` | תיעוד ה-API של פיקוד העורף |
-| `references/home-assistant.md` | מדריך אינטגרציית Home Assistant |
+| קונטיינר | תפקיד | פורט |
+|----------|-------|------|
+| `oref-alerts` | Proxy → Pikud Ha-Oref API | 49000 |
+| `oref-monitor` | Monitor + dispatch | internal |
 
 ---
 
-## 🚀 התקנה מהירה (מומלץ)
+## התקנה מהירה (Deploy)
+
+### דרישות מוקדמות
+```bash
+# Docker
+apt install docker.io -y
+
+# wacli (שליחת WhatsApp)
+go install github.com/steipete/wacli/cmd/wacli@latest
+# ואז: wacli auth  ← סרוק QR
+```
+
+### פריסה
 
 ```bash
-git clone https://github.com/shaike1/openclaw-redalert
-cd openclaw-redalert
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
-```
+cd /root/.openclaw/workspace/skills/oref-alerts
 
-הסקריפט ישאל אותך שלב אחר שלב על:
-1. הגדרות WhatsApp
-2. Home Assistant (אופציונלי)
-3. חיוג 3CX (אופציונלי)
+# 1. הפעל oref-alerts (proxy API)
+docker run -d \
+  --name oref-alerts \
+  --restart unless-stopped \
+  -p 49000:9001 \
+  -e TZ="Asia/Jerusalem" \
+  dmatik/oref-alerts:latest
+
+# 2. בנה oref-monitor
+docker build -t oref-monitor .
+
+# 3. הפעל oref-monitor
+docker run -d \
+  --name oref-monitor \
+  --restart unless-stopped \
+  --link oref-alerts:oref-alerts \
+  -v /root/go/bin/wacli:/usr/local/bin/wacli:ro \
+  -v /root/.wacli:/root/.wacli:ro \
+  -e OREF_API_URL="http://oref-alerts:9001/current" \
+  -e MONITORED_AREAS="הרצליה,הרצליה - גליל ים ומרכז" \
+  -e WHATSAPP_GROUP_JID="120363417492964228@g.us" \
+  -e WHATSAPP_OWNER="+972525173322" \
+  -e HASS_SERVER="https://ha.right-api.com" \
+  -e HASS_TOKEN="YOUR_HA_LONG_LIVED_TOKEN" \
+  -e HA_TTS_SPEAKER="media_player.home_assistant_voice_09a069" \
+  oref-monitor
+```
 
 ---
 
-## ⚙️ אפשרויות התקנה
+## משתני סביבה
 
-### 🥉 מינימלי — WhatsApp בלבד
-
-```bash
-WHATSAPP_GROUP_JID=120363417492964228@g.us
-WHATSAPP_OWNER=+972525173322
-```
-
-✅ קבל התרעות WhatsApp  
-❌ ללא קול  
-❌ ללא חיוג
-
----
-
-### 🥈 מומלץ — WhatsApp + TTS קולי
-
-```bash
-WHATSAPP_GROUP_JID=120363417492964228@g.us
-WHATSAPP_OWNER=+972525173322
-HASS_SERVER=https://your-ha.example.com
-HASS_TOKEN=your_long_lived_token
-HA_TTS_SPEAKER=media_player.home_assistant_voice_09a069
-HA_ALERT_LIGHTS=light.living_room,light.kids_room
-```
-
-✅ WhatsApp  
-✅ הכרזה קולית ברמקול  
-✅ הבהוב אורות אדומים  
-❌ ללא חיוג
-
----
-
-### 🥇 מלא — WhatsApp + TTS + חיוג טלפוני
-
-```bash
-WHATSAPP_GROUP_JID=120363417492964228@g.us
-WHATSAPP_OWNER=+972525173322
-HASS_SERVER=https://your-ha.example.com
-HASS_TOKEN=your_long_lived_token
-HA_TTS_SPEAKER=media_player.home_assistant_voice_09a069
-HA_ALERT_LIGHTS=light.living_room,light.kids_room
-OREF_PHONE_CALL=true
-PHONE_ALERT_NUMBERS=+972525173322,+972545000000
-CX3_GATEWAY_URL=http://localhost:8090
-CX3_EXTENSION=100
-```
-
-✅ WhatsApp  
-✅ הכרזה קולית  
-✅ אורות  
-✅ חיוג אוטומטי לכל המספרים
-
----
-
-## 🔧 משתני סביבה
-
-### ORef API
 | משתנה | ברירת מחדל | תיאור |
 |-------|-----------|-------|
-| `OREF_API_URL` | `http://localhost:9001/current` | כתובת API |
+| `OREF_API_URL` | `http://localhost:9001/current` | כתובת proxy API |
+| `MONITORED_AREAS` | ריק = כל הארץ | אזורים לניטור, מופרדים בפסיק |
 | `OREF_POLL_INTERVAL` | `5` | שניות בין בדיקות |
-| `OREF_COOLDOWN` | `60` | שניות בין התרעות חוזרות |
-
-### WhatsApp
-| משתנה | תיאור |
-|-------|-------|
-| `WHATSAPP_GROUP_JID` | JID של קבוצת WhatsApp (לדוגמה: `120363...@g.us`) |
-| `WHATSAPP_OWNER` | מספר אישי (לדוגמה: `+972525173322`) |
-
-### Home Assistant
-| משתנה | ברירת מחדל | תיאור |
-|-------|-----------|-------|
-| `HASS_SERVER` | ריק | כתובת HA (לדוגמה: `https://ha.example.com`) |
-| `HASS_TOKEN` | ריק | Long-Lived Access Token |
-| `HA_TTS_SPEAKER` | `media_player.home_assistant_voice_09a069` | entity_id רמקול |
-| `HA_ALERT_LIGHTS` | ריק | entity_ids אורות (מופרדים בפסיק) |
-
-### 3CX חיוג
-| משתנה | ברירת מחדל | תיאור |
-|-------|-----------|-------|
-| `OREF_PHONE_CALL` | `false` | הפעלת חיוג (`true`/`false`) |
-| `CX3_GATEWAY_URL` | `http://localhost:8090` | כתובת openclaw-3cx gateway |
-| `CX3_EXTENSION` | ריק | מספר שלוחה |
-| `PHONE_ALERT_NUMBERS` | ריק | מספרי טלפון (מופרדים בפסיק) |
+| `OREF_COOLDOWN` | `60` | שניות צינון בין התרעות |
+| `WHATSAPP_GROUP_JID` | - | JID של קבוצת WhatsApp |
+| `WHATSAPP_OWNER` | - | מספר WhatsApp אישי |
+| `HASS_SERVER` | - | כתובת Home Assistant |
+| `HASS_TOKEN` | - | HA Long-Lived Token |
+| `HA_TTS_SPEAKER` | `media_player.home_assistant_voice_09a069` | רמקול TTS |
+| `HA_ALERT_LIGHTS` | - | אורות להבהוב (entity_id מופרדים בפסיק) |
+| `WA_BIN` | `wacli` | נתיב לבינארי wacli |
 
 ---
 
-## 📋 פקודות שימושיות
+## בדיקה (Testing)
 
+### בדוק ה-API ישירות
 ```bash
-# סטטוס השירות
-systemctl status oref-monitor-openclaw
+# כל התרעות פעילות
+curl -s http://localhost:49000/current | python3 -m json.tool
 
-# לוגים חיים
-journalctl -u oref-monitor-openclaw -f
+# פלט לדוגמה (אין התרעה):
+# {"alert": false, "current": {}}
 
-# הפעלה מחדש
-systemctl restart oref-monitor-openclaw
+# פלט לדוגמה (יש התרעה):
+# {"alert": true, "current": {"cat": "1", "title": "ירי רקטות", "data": ["הרצליה - גליל ים ומרכז"]}}
+```
 
-# עצירה
-systemctl stop oref-monitor-openclaw
+### בדוק סטטוס קונטיינרים
+```bash
+docker ps | grep oref
+# → oref-alerts   Up X minutes   0.0.0.0:49000->9001/tcp
+# → oref-monitor  Up X minutes
+```
 
-# בדיקת API
-curl -s http://localhost:9001/current | python3 -m json.tool
+### בדוק לוגים
+```bash
+# מוניטור (מה קורה בזמן אמת)
+docker logs oref-monitor -f --tail 30
 
-# בדיקת container
-docker ps | grep oref-alerts
+# API proxy
 docker logs oref-alerts --tail 20
 ```
 
----
-
-## 🔄 עדכון הגדרות
-
+### הפעל מצב TEST (התרעת דמה בהרצליה)
 ```bash
-# ערוך הגדרות
-nano /root/.openclaw/workspace/skills/oref-alerts/.env
+docker stop oref-alerts && docker rm oref-alerts
 
-# הפעל מחדש
-systemctl restart oref-monitor-openclaw
+docker run -d \
+  --name oref-alerts \
+  -p 49000:9001 \
+  -e TZ="Asia/Jerusalem" \
+  -e CURRENT_ALERT_TEST_MODE=TRUE \
+  -e CURRENT_ALERT_TEST_MODE_LOC="הרצליה - גליל ים ומרכז" \
+  dmatik/oref-alerts:latest
+
+# המתן 10 שניות ובדוק:
+docker logs oref-monitor --tail 20
+
+# אחרי הבדיקה - החזר לרגיל:
+docker stop oref-alerts && docker rm oref-alerts
+docker run -d --name oref-alerts --restart unless-stopped \
+  -p 49000:9001 -e TZ="Asia/Jerusalem" dmatik/oref-alerts:latest
 ```
 
 ---
 
-## 🐛 פתרון בעיות
+## סינון אזורים (ללא כפילויות)
 
-### API לא מגיב
-```bash
-docker ps | grep oref-alerts
-docker restart oref-alerts
-curl -s http://localhost:9001/current
+המערכת כוללת מנגנון חכם למניעת כפילויות:
+
+1. **Alert ID** - כל התרעה מקבלת ID ייחודי → לא נשלחת פעמיים
+2. **Cooldown** - 60 שניות מינימום בין התרעות
+3. **סינון אזורי** - בדיקה לפני שליחה → רק התרעות באזורך
+
 ```
+התרעה ב: נערן, שדה בר
+MONITORED_AREAS: הרצליה
+→ לא מתאים → מדלג ✅ (ללא כפילות)
 
-### WhatsApp לא שולח
-```bash
-openclaw status
-journalctl -u oref-monitor-openclaw -n 20
-```
-
-### HA TTS לא עובד
-```bash
-curl -H "Authorization: Bearer $HASS_TOKEN" $HASS_SERVER/api/
+התרעה ב: הרצליה - גליל ים ומרכז, נתניה
+MONITORED_AREAS: הרצליה
+→ מתאים → שולח התרעה 🚨
 ```
 
 ---
 
-## 📄 רישיון
+## סוגי התרעות
 
-MIT License — עשה בחופשיות!
+| קטגוריה | סוג | פעולה |
+|---------|-----|-------|
+| cat=1 | 🚀 ירי רקטות וטילים | WA + TTS + אורות אדום |
+| cat=2 | ✈️ חדירת כלי טיס | WA + TTS + אורות אדום |
+| cat=10 | 🔴 חדירת מחבלים | WA + TTS + אורות אדום |
+| cat=13 | ✅ סיום אירוע | WA + TTS + אורות ירוק |
+| cat=14 | ⚠️ התרעה מקדימה | WA + TTS + אורות כתום |
 
 ---
 
-*Made with ❤️ by OpenClaw Community*
+## הפעלה מחדש
+
+```bash
+# הפעל מחדש הכל
+docker restart oref-alerts oref-monitor
+
+# עצור הכל
+docker stop oref-alerts oref-monitor
+
+# בנה מחדש (אחרי שינוי בקוד)
+docker stop oref-monitor && docker rm oref-monitor
+docker build -t oref-monitor /root/.openclaw/workspace/skills/oref-alerts/
+# ואז הרץ שוב את פקודת docker run מלמעלה
+```
+
+---
+
+## ⚠️ שגיאה נפוצה - שני מוניטורים במקביל
+
+**בעיה:** אם `skills/oref-alerts/monitor.py` רץ **ישירות** (לא דרך Docker), הוא שולח התרעות מ**כל הארץ** כי הוא לא מקבל את ה-env variables עם `MONITORED_AREAS`.
+
+**איבחון:**
+```bash
+ps aux | grep monitor.py | grep -v grep
+# אם רואים שני תהליכים → בעיה!
+```
+
+**פתרון:**
+```bash
+# הרוג את התהליך הישיר (שאינו Docker)
+kill $(ps aux | grep "skills/oref-alerts/monitor.py" | grep -v grep | awk '{print $2}')
+
+# רק ה-Docker container צריך לרוץ:
+docker ps | grep oref-monitor
+```
+
+**הכלל:** רק ה-Docker `oref-monitor` אמור לרוץ. **לעולם אל תפעיל את monitor.py ישירות.**
+
+---
+
+## קבצים
+
+```
+oref-alerts/
+├── monitor.py          ← מוניטור Python (הקוד הראשי)
+├── Dockerfile          ← קונטיינר oref-monitor
+├── docker-compose.yml  ← הגדרות Docker Compose
+├── README.md           ← המסמך הזה
+├── SKILL.md            ← תיעוד Skill ל-OpenClaw
+├── ha_config.yaml      ← קונפיג Home Assistant (אופציונלי)
+└── scripts/
+    ├── deploy.sh           ← סקריפט פריסה
+    ├── standalone_monitor.py ← גרסה ישירה (ללא Docker)
+    └── whatsapp-notify.sh  ← עוזר WhatsApp
+```

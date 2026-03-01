@@ -149,10 +149,10 @@ def ha_post(endpoint: str, payload: dict) -> bool:
 
 
 def ha_tts(text: str):
-    ha_post("services/tts/speak", {
+    ha_post("services/tts/google_translate_say", {
         "entity_id": HA_TTS_SPEAKER,
         "message": text,
-        "language": "he"
+        "language": "iw"
     })
 
 

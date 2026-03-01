@@ -104,10 +104,17 @@ logging.basicConfig(
 )
 log = logging.getLogger("oref")
 
+# Self-check / heartbeat
+HEARTBEAT_INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL", str(24 * 3600)))  # seconds, default 24h
+API_FAIL_ALERT_AFTER = int(os.getenv("API_FAIL_ALERT_AFTER", "120"))        # seconds of consecutive API failures before alerting
+
 # State
 last_alert_id     = None
 alert_sent_at     = None
 all_clear_sent    = False   # מניע שליחת "ניתן לצאת" כפולה
+last_heartbeat_at = None
+api_fail_since    = None    # timestamp when consecutive API failures started
+api_fail_alerted  = False   # avoid repeated "API down" messages
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -149,10 +156,10 @@ def ha_post(endpoint: str, payload: dict) -> bool:
 
 
 def ha_tts(text: str):
-    ha_post("services/tts/speak", {
+    ha_post("services/tts/google_translate_say", {
         "entity_id": HA_TTS_SPEAKER,
         "message": text,
-        "language": "he"
+        "language": "iw"
     })
 
 

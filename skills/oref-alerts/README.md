@@ -11,15 +11,18 @@ Pikud Ha-Oref API (oref.org.il)
         ↓
 Docker: dmatik/oref-alerts  (:49000)
         ↓
-Docker: oref-monitor (Python)
+systemd: oref-monitor.service  (monitor.py)
         ↓  ↓  ↓
    📱 WA  🔊 TTS  💡 Lights
 ```
 
-| קונטיינר | תפקיד | פורט |
-|----------|-------|------|
-| `oref-alerts` | Proxy → Pikud Ha-Oref API | 49000 |
-| `oref-monitor` | Monitor + dispatch | internal |
+| רכיב | תפקיד | ניהול |
+|------|-------|-------|
+| `oref-alerts` | Proxy → Pikud Ha-Oref API, פורט 49000 | Docker |
+| `oref-monitor.service` | Python monitor + dispatch | systemd |
+
+> **WhatsApp נשלח דרך `wa-send.sh`** — wrapper ל-`openclaw message send`.
+> wacli לא נדרש (ולא צריך אימות QR).
 
 ---
 
@@ -27,12 +30,11 @@ Docker: oref-monitor (Python)
 
 ### דרישות מוקדמות
 ```bash
-# Docker
+# Docker (עבור oref-alerts API proxy)
 apt install docker.io -y
 
-# wacli (שליחת WhatsApp)
-go install github.com/steipete/wacli/cmd/wacli@latest
-# ואז: wacli auth  ← סרוק QR
+# OpenClaw (כבר מותקן — לשליחת WhatsApp)
+which openclaw
 ```
 
 ### פריסה
@@ -48,33 +50,25 @@ docker run -d \
   -e TZ="Asia/Jerusalem" \
   dmatik/oref-alerts:latest
 
-# 2. בנה oref-monitor
-docker build -t oref-monitor .
+# 2. הגדר .env (העתק מ-.env.example ומלא ערכים)
+cp .env.example .env
+nano .env
 
-# 3. הפעל oref-monitor
-docker run -d \
-  --name oref-monitor \
-  --restart unless-stopped \
-  --link oref-alerts:oref-alerts \
-  -v /root/go/bin/wacli:/usr/local/bin/wacli:ro \
-  -v /root/.wacli:/root/.wacli:ro \
-  -e OREF_API_URL="http://oref-alerts:9001/current" \
-  -e MONITORED_AREAS="הרצליה,הרצליה - גליל ים ומרכז" \
-  -e WHATSAPP_GROUP_JID="120363417492964228@g.us" \
-  -e WHATSAPP_OWNER="+972525173322" \
-  -e HASS_SERVER="https://ha.right-api.com" \
-  -e HASS_TOKEN="YOUR_HA_LONG_LIVED_TOKEN" \
-  -e HA_TTS_SPEAKER="media_player.home_assistant_voice_09a069" \
-  oref-monitor
+# 3. הפעל systemd service
+systemctl daemon-reload
+systemctl enable oref-monitor
+systemctl start oref-monitor
 ```
 
 ---
 
 ## משתני סביבה
 
+מוגדרים בקובץ `.env` (הקובץ **מחוץ ל-git**, ראה `.gitignore`):
+
 | משתנה | ברירת מחדל | תיאור |
 |-------|-----------|-------|
-| `OREF_API_URL` | `http://localhost:9001/current` | כתובת proxy API |
+| `OREF_API_URL` | `http://localhost:49000/current` | כתובת proxy API (host) |
 | `MONITORED_AREAS` | ריק = כל הארץ | אזורים לניטור, מופרדים בפסיק |
 | `OREF_POLL_INTERVAL` | `5` | שניות בין בדיקות |
 | `OREF_COOLDOWN` | `60` | שניות צינון בין התרעות |
@@ -84,7 +78,24 @@ docker run -d \
 | `HASS_TOKEN` | - | HA Long-Lived Token |
 | `HA_TTS_SPEAKER` | `media_player.home_assistant_voice_09a069` | רמקול TTS |
 | `HA_ALERT_LIGHTS` | - | אורות להבהוב (entity_id מופרדים בפסיק) |
-| `WA_BIN` | `wacli` | נתיב לבינארי wacli |
+| `WA_BIN` | `wacli` | נתיב לסקריפט שליחת WhatsApp (ראה wa-send.sh) |
+
+---
+
+## שליחת WhatsApp דרך OpenClaw
+
+המוניטור משתמש ב-`wa-send.sh` (מוגדר ב-service כ-`WA_BIN`):
+
+```bash
+# wa-send.sh מתרגם את הפרמטרים של wacli:
+#   wacli send text --to <target> --message <msg>
+# → openclaw message send --channel whatsapp --target <target> --message <msg>
+```
+
+ה-service מגדיר אוטומטית:
+```
+Environment=WA_BIN=/root/.openclaw/workspace/skills/oref-alerts/wa-send.sh
+```
 
 ---
 
@@ -92,7 +103,6 @@ docker run -d \
 
 ### בדוק ה-API ישירות
 ```bash
-# כל התרעות פעילות
 curl -s http://localhost:49000/current | python3 -m json.tool
 
 # פלט לדוגמה (אין התרעה):
@@ -102,17 +112,22 @@ curl -s http://localhost:49000/current | python3 -m json.tool
 # {"alert": true, "current": {"cat": "1", "title": "ירי רקטות", "data": ["הרצליה - גליל ים ומרכז"]}}
 ```
 
-### בדוק סטטוס קונטיינרים
+### בדוק סטטוס
 ```bash
-docker ps | grep oref
+# systemd service
+systemctl status oref-monitor
+
+# Docker API proxy
+docker ps | grep oref-alerts
 # → oref-alerts   Up X minutes   0.0.0.0:49000->9001/tcp
-# → oref-monitor  Up X minutes
 ```
 
 ### בדוק לוגים
 ```bash
-# מוניטור (מה קורה בזמן אמת)
-docker logs oref-monitor -f --tail 30
+# מוניטור — בזמן אמת
+tail -f /var/log/oref-monitor.log
+# או:
+journalctl -u oref-monitor -f
 
 # API proxy
 docker logs oref-alerts --tail 20
@@ -131,7 +146,7 @@ docker run -d \
   dmatik/oref-alerts:latest
 
 # המתן 10 שניות ובדוק:
-docker logs oref-monitor --tail 20
+tail -f /var/log/oref-monitor.log
 
 # אחרי הבדיקה - החזר לרגיל:
 docker stop oref-alerts && docker rm oref-alerts
@@ -152,7 +167,7 @@ docker run -d --name oref-alerts --restart unless-stopped \
 ```
 התרעה ב: נערן, שדה בר
 MONITORED_AREAS: הרצליה
-→ לא מתאים → מדלג ✅ (ללא כפילות)
+→ לא מתאים → מדלג ✅
 
 התרעה ב: הרצליה - גליל ים ומרכז, נתניה
 MONITORED_AREAS: הרצליה
@@ -168,7 +183,7 @@ MONITORED_AREAS: הרצליה
 | cat=1 | 🚀 ירי רקטות וטילים | ✅ | ✅ | 🔴 אדום |
 | cat=2 | ✈️ חדירת כלי טיס | ✅ | ✅ | 🔴 אדום |
 | cat=10 | 🔴 חדירת מחבלים | ✅ | ✅ | 🔴 אדום |
-| cat=13 | ✅ סיום אירוע | ✅ | ✅ | 🟢 ירוק |
+| cat=13 | ✅ סיום אירוע | ❌ רמקול בלבד | ✅ | 🟢 ירוק |
 | cat=14 | ⚠️ התרעה מוקדמת | ❌ רמקול בלבד | ✅ | 🟠 כתום |
 
 > **הגיון:** סיום אירוע והתרעה מוקדמת הן פחות דחופות - רמקול מספיק, בלי להטריד ב-WhatsApp.
@@ -178,40 +193,19 @@ MONITORED_AREAS: הרצליה
 ## הפעלה מחדש
 
 ```bash
-# הפעל מחדש הכל
-docker restart oref-alerts oref-monitor
+# הפעל מחדש מוניטור
+systemctl restart oref-monitor
+
+# הפעל מחדש API proxy
+docker restart oref-alerts
 
 # עצור הכל
-docker stop oref-alerts oref-monitor
+systemctl stop oref-monitor
+docker stop oref-alerts
 
-# בנה מחדש (אחרי שינוי בקוד)
-docker stop oref-monitor && docker rm oref-monitor
-docker build -t oref-monitor /root/.openclaw/workspace/skills/oref-alerts/
-# ואז הרץ שוב את פקודת docker run מלמעלה
+# שנוי בקוד monitor.py → רק restart לservice
+systemctl restart oref-monitor
 ```
-
----
-
-## ⚠️ שגיאה נפוצה - שני מוניטורים במקביל
-
-**בעיה:** אם `skills/oref-alerts/monitor.py` רץ **ישירות** (לא דרך Docker), הוא שולח התרעות מ**כל הארץ** כי הוא לא מקבל את ה-env variables עם `MONITORED_AREAS`.
-
-**איבחון:**
-```bash
-ps aux | grep monitor.py | grep -v grep
-# אם רואים שני תהליכים → בעיה!
-```
-
-**פתרון:**
-```bash
-# הרוג את התהליך הישיר (שאינו Docker)
-kill $(ps aux | grep "skills/oref-alerts/monitor.py" | grep -v grep | awk '{print $2}')
-
-# רק ה-Docker container צריך לרוץ:
-docker ps | grep oref-monitor
-```
-
-**הכלל:** רק ה-Docker `oref-monitor` אמור לרוץ. **לעולם אל תפעיל את monitor.py ישירות.**
 
 ---
 
@@ -220,8 +214,11 @@ docker ps | grep oref-monitor
 ```
 oref-alerts/
 ├── monitor.py          ← מוניטור Python (הקוד הראשי)
-├── Dockerfile          ← קונטיינר oref-monitor
-├── docker-compose.yml  ← הגדרות Docker Compose
+├── wa-send.sh          ← wrapper: openclaw message send (במקום wacli ישיר)
+├── .env                ← משתני סביבה (מחוץ ל-git!)
+├── .env.example        ← תבנית ל-.env
+├── Dockerfile          ← קונטיינר Docker (לא בשימוש ב-production)
+├── docker-compose.yml  ← הגדרות Docker Compose (לא בשימוש ב-production)
 ├── README.md           ← המסמך הזה
 ├── SKILL.md            ← תיעוד Skill ל-OpenClaw
 ├── ha_config.yaml      ← קונפיג Home Assistant (אופציונלי)
@@ -230,3 +227,9 @@ oref-alerts/
     ├── standalone_monitor.py ← גרסה ישירה (ללא Docker)
     └── whatsapp-notify.sh  ← עוזר WhatsApp
 ```
+
+### systemd service
+```
+/etc/systemd/system/oref-monitor.service
+```
+מוגדר עם `EnvironmentFile=.env` ו-`WA_BIN=wa-send.sh`. מופעל אוטומטית עם הפעלת המערכת.

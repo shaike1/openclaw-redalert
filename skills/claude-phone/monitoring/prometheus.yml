@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'voice-gateway'
+    static_configs:
+      - targets: ['voice-gateway:8080']
+
+  - job_name: 'voice-processor'
+    static_configs:
+      - targets: ['voice-processor:8080']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']

@@ -1,0 +1,124 @@
+# ORef Alert Automation - Herziya Area
+# Sends alerts to speaker and WhatsApp group
+
+automation:
+  # ========== TRIGGER ON NEW ALERT ==========
+  - alias: "ORef Alert - New Alert Announcement"
+    id: oref_alert_new_alert_announcement
+    description: "Announce new ORef alerts on speaker and WhatsApp"
+    trigger:
+      - platform: state
+        entity_id: sensor.oref_alert_hrtslyh_glyl_ym
+        from: ok
+        to: alert
+      - platform: state
+        entity_id: sensor.oref_alert_hrtslyh_glyl_ym
+        from: pre_alert
+        to: alert
+
+    action:
+      # ========== TTS ANNOUNCEMENT ==========
+      - service: tts.speak
+        target:
+          entity_id: media_player.home_assistant_voice_09a069
+        data:
+          message: >
+            {%- set title = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record').title -%}
+            {%- set data = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record').data -%}
+            אזעקת צבע אדום! {{ title }}. אזור: {{ data }}. היכנסו מיד למרחב מוגן.
+          language: he
+
+      # ========== WHATSAPP NOTIFICATION ==========
+      - service: whatsapp.send_message
+        data:
+          message: |
+            🚨 **אזעקת צבע אדום - פיקוד העורף**
+
+            {% set record = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record') %}
+            📢 {{ record.title }}
+
+            📍 אזור: {{ record.data }}
+            ⏰ זמן: {{ record.alertDate }}
+
+            ⚠️ היכנסו מיד למרחב מוגן!
+
+            ---
+            🤖 הודעה אוטומטית מ-Luky Bot
+          target: "120363417492964228@g.us"
+
+  # ========== TRIGGER ON PRE-ALERT ==========
+  - alias: "ORef Alert - Pre-Alert Announcement"
+    id: oref_alert_pre_alert_announcement
+    description: "Announce pre-alert warnings"
+    trigger:
+      - platform: state
+        entity_id: sensor.oref_alert_hrtslyh_glyl_ym
+        from: ok
+        to: pre_alert
+
+    action:
+      - service: tts.speak
+        target:
+          entity_id: media_player.home_assistant_voice_09a069
+        data:
+          message: >
+            {%- set title = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record').title -%}
+            {%- set data = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record').data -%}
+            אזעקת צבע צהוב! {{ title }}. היכנסו לקרבת מרחב מוגן.
+          language: he
+
+      - service: whatsapp.send_message
+        data:
+          message: |
+            ⚠️ **אזעקת צבע צהוב - פיקוד העורף**
+
+            {% set record = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record') %}
+            📢 {{ record.title }}
+
+            📍 אזור: {{ record.data }}
+            ⏰ זמן: {{ record.alertDate }}
+
+            🔶 היכנסו לקרבת מרחב מוגן!
+
+            ---
+            🤖 הודעה אוטומטית מ-Luky Bot
+          target: "120363417492964228@g.us"
+
+  # ========== ALL CLEAR ANNOUNCEMENT ==========
+  - alias: "ORef Alert - All Clear Announcement"
+    id: oref_alert_all_clear_announcement
+    description: "Announce when alert is over"
+    trigger:
+      - platform: state
+        entity_id: sensor.oref_alert_hrtslyh_glyl_ym
+        from:
+          - alert
+          - pre_alert
+        to: ok
+
+    action:
+      - delay:
+          seconds: 5  # Wait a bit before announcing all-clear
+
+      - service: tts.speak
+        target:
+          entity_id: media_player.home_assistant_voice_09a069
+        data:
+          message: >
+            סיום אזעקה. ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו.
+          language: he
+
+      - service: whatsapp.send_message
+        data:
+          message: |
+            ✅ **סיום אזעקה - פיקוד העורף**
+
+            {% set record = state_attr('sensor.oref_alert_hrtslyh_glyl_ym', 'record') %}
+            📍 אזור: {{ record.data if record else 'הרצליה - מרכז וגליל ים' }}
+            ⏰ זמן סיום: {{ now().strftime('%H:%M') }}
+
+            ✅ ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו.
+
+            ---
+            🤖 הודעה אוטומטית מ-Luky Bot
+          target: "120363417492964228@g.us"

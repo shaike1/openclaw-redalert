@@ -1,0 +1,43 @@
+# Voice Processor Requirements
+# STT → LLM → TTS Pipeline
+
+# FastAPI web framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# OpenAI (Whisper STT)
+openai==1.10.0
+
+# Anthropic (Claude AI)
+anthropic==0.18.0
+
+# ElevenLabs (TTS)
+elevenlabs==1.1.2
+
+# Audio processing
+numpy==1.26.3
+soundfile==0.12.1
+pydub==0.25.1
+librosa==0.10.1
+
+# Redis (State management)
+redis==5.0.1
+
+# HTTP client
+httpx==0.26.0
+aiohttp==3.9.1
+
+# Logging & monitoring
+structlog==24.1.0
+prometheus-client==0.19.0
+
+# Environment config
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Utilities
+python-dateutil==2.8.2
+tzdata==2024.1

@@ -116,15 +116,14 @@ all_clear_sent    = False   # מניע שליחת "ניתן לצאת" כפולה
 def send_whatsapp(target: str, message: str):
     if not target:
         return
+    # Support env-override for WA binary path (default: wacli)
+    wa_bin = os.getenv("WA_BIN", "wacli")
     try:
         r = subprocess.run(
-            ["openclaw", "message", "send",
-             "--channel", "whatsapp",
-             "--target", target,
-             "--message", message],
+            [wa_bin, "send", "text", "--to", target, "--message", message],
             capture_output=True, text=True, timeout=15
         )
-        log.info(f"✅ WhatsApp → {target}") if r.returncode == 0 else log.error(f"❌ WA: {r.stderr[:80]}")
+        log.info(f"✅ WhatsApp → {target}") if r.returncode == 0 else log.error(f"❌ WA ({r.returncode}): {r.stderr[:120]}")
     except Exception as e:
         log.error(f"❌ WA failed: {e}")
 
@@ -292,6 +291,14 @@ def check_alert():
             all_clear_sent = True
             dispatch_alert(data)
         return
+
+    # סינון לפי אזורים מנוטרים (אם מוגדרים)
+    if MONITORED_AREAS:
+        areas_in_alert = current.get("data", []) or []
+        matched = [a for a in areas_in_alert if any(m in a or a in m for m in MONITORED_AREAS)]
+        if not matched:
+            log.debug(f"⏭️ Alert in {areas_in_alert} - not in monitored areas, skipping")
+            return
 
     # מנע ספאם
     if alert_id == last_alert_id:

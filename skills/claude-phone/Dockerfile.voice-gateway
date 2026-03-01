@@ -1,0 +1,34 @@
+# Voice Gateway - SIP/3CX Call Handler (Simplified)
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies (without PJSIP for now)
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libssl-dev \
+    pkg-config \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements-gateway.txt /app/
+RUN pip install --no-cache-dir -r requirements-gateway.txt
+
+# Copy application code
+COPY src-gateway/ /app/
+
+# Create log directory
+RUN mkdir -p /var/log/voice
+
+# Expose health check port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run the gateway
+CMD ["python", "gateway.py"]

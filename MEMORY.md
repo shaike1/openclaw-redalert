@@ -1,6 +1,20 @@
 # MEMORY.md - Luky Bot Memory
 
 ## Latest Updates
+- **2026-02-27 21:10**: OpenClaw-3CX Voice v2 code complete ✅
+  - Dockerfiles created (voice-processor, voice-gateway)
+  - Full Python code (STT, LLM, TTS, Redis, FastAPI)
+  - Build script: build-v2.sh
+  - Ready to build: `./build-v2.sh`
+  - Next: Build images and deploy POC
+
+- **2026-02-27**: OpenClaw-3CX Voice v2 POC infrastructure ready ✅
+  - Created docker-compose.voice-v2.yml (Dockerized architecture)
+  - Deployment script: voice-v2-deploy.sh
+  - Test suite: test-voice-v2.sh
+  - Full guide: VOICE_V2_POC_GUIDE.md
+  - Status: STATUS.md
+
 - **2026-02-25**: OpenClaw upgraded to v2026.2.23 ✅
   - Cleaned up duplicate Webtop skills
   - Kept only: pywebtop-skill (working)
@@ -28,6 +42,8 @@
 ## System Access
 - **WhatsApp**: +972527497367 (luky bot)
 - **Home Assistant**: https://ha.right-api.com (token configured)
+  - HASS_TOKEN: REDACTED_HA_TOKEN_1
+  - Updated: 2026-03-01 ✅
 - **Spotify**: OAuth configured
 - **Discord**: @luky
 
@@ -100,3 +116,10 @@ cp -r openclaw-backup/* /root/.openclaw/
 - luky bot (100.64.0.7) - WhatsApp + Discord
 - sh.ai bot (100.64.0.12) - WhatsApp + Discord
 
+
+## Voice Call Fix (2026-03-01)
+- **בעיה:** openclaw-http-bridge.py חיפש openclaw ב-nvm path ישן
+- **תיקון:** שינוי שורה 14 ב-/usr/local/bin/openclaw-http-bridge.py
+  - מ: `/root/.nvm/versions/node/v22.22.0/bin/openclaw`
+  - ל: `/usr/bin/openclaw`
+- **סטטוס:** ✅ עובד - voice calls מגיבים

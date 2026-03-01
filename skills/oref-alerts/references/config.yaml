@@ -1,0 +1,20 @@
+whatsapp:
+  group_id: "120363417492964228@g.us"
+  enabled: true
+home_assistant:
+  url: "http://localhost:8123"
+  api_token: ""
+  rest_sensor_host: "localhost"
+  rest_sensor_port: 49000
+locations:
+  monitored:
+    - "אשדוד"
+    - "אשקלון"
+    - "תל אביב"
+    - "ירושלים"
+    - "באר שבע"
+  home_city: "אשדוד"
+notifications:
+  alert_format: "🚨 צבע אדום! {title} - {data} - היכנסו למרחב המוגן!"
+  clear_format: "✅ ההתראה הסתיימה"
+  min_alert_interval: 60

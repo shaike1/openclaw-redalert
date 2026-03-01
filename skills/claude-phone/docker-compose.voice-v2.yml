@@ -1,0 +1,110 @@
+# OpenClaw-3CX Voice v2 - Docker Compose POC
+# This is a parallel deployment for testing without downtime
+
+version: '3.8'
+
+services:
+  # SIP/3CX Gateway - Incoming Call Handler
+  voice-gateway:
+    image: voice-gateway:v2
+    container_name: voice-gateway-v2
+    restart: unless-stopped
+    ports:
+      - "5070:5060/udp"  # SIP (different from v1 to avoid conflict)
+      - "5071:5061/tcp"  # SIP TLS
+      - "8082:8080"      # Health check (different from v1)
+    env_file:
+      - .env.voice-v2
+    environment:
+      - SIP_SERVER=${SIP_SERVER:-pbx.right-api.com}
+      - SIP_USERNAME=${SIP_USERNAME:-voice-bot-v2}
+      - SIP_PASSWORD=${SIP_PASSWORD}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://voice-processor:8080/incoming}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CLAWDBOT_ID=${CLAWDBOT_ID:-luky-v2}
+    volumes:
+      - ./logs/gateway:/var/log/voice
+    networks:
+      - voice-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Voice Processor - OpenAI Whisper STT + Claude AI + ElevenLabs TTS
+  voice-processor:
+    image: voice-processor:v2
+    container_name: voice-processor-v2
+    restart: unless-stopped
+    ports:
+      - "8083:8080"  # API (v1 uses 8081, v2 uses 8083)
+    env_file:
+      - .env.voice-v2
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      - STT_MODEL=${STT_MODEL:-whisper-1}
+      - LLM_MODEL=${LLM_MODEL:-claude-3-7-sonnet-20250219}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_CALL_DURATION=${MAX_CALL_DURATION:-300}
+      - LANGUAGE=${LANGUAGE:-he}
+    volumes:
+      - ./logs/processor:/var/log/voice
+      - ./tmp/audio:/tmp/voice
+    networks:
+      - voice-net
+    depends_on:
+      voice-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis - Call State & Session Management
+  redis:
+    image: redis:7-alpine
+    container_name: voice-redis-v2
+    restart: unless-stopped
+    ports:
+      - "6381:6379"  # Different port to avoid conflict (6381 instead of 6380)
+    volumes:
+      - redis-data:/data
+    networks:
+      - voice-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Monitoring - Prometheus + Grafana (optional, for POC)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: voice-prometheus-v2
+    restart: unless-stopped
+    ports:
+      - "9091:9090"  # Different port
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - voice-net
+
+networks:
+  voice-net:
+    driver: bridge
+    name: voice-v2-net
+
+volumes:
+  redis-data:
+    name: voice-v2-redis-data
+  prometheus-data:
+    name: voice-v2-prometheus-data

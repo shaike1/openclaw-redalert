@@ -1,0 +1,165 @@
+#!/usr/bin/env python3
+"""
+ORef Standalone Monitor
+בודק התרעות פיקוד העורף כל 5 שניות
+שולח TTS לרמקול + WhatsApp - ללא Home Assistant
+"""
+
+import requests
+import time
+import json
+import os
+from datetime import datetime
+
+# ====== הגדרות ======
+OREF_API = "http://localhost:49000/current"
+ALERT_AREAS = ["הרצליה - גליל ים ומרכז"]  # האזורים שלך
+
+# Home Assistant Voice API
+HA_URL = os.getenv("HA_URL", "http://192.168.88.253:8443")
+HA_TOKEN = os.getenv("HA_TOKEN", "")
+HA_MEDIA_PLAYER = os.getenv("HA_MEDIA_PLAYER", "media_player.home_assistant_voice_09a069_media_player")
+
+# WhatsApp (OpenClaw)
+OPENCLAW_URL = os.getenv("OPENCLAW_URL", "http://localhost:3000")
+WHATSAPP_GROUP = os.getenv("WHATSAPP_GROUP", "")  # JID של הקבוצה
+
+# ====== מצב ======
+current_alert_id = None
+last_alert_time = 0
+COOLDOWN_SECONDS = 60  # לא לשלוח שוב תוך דקה
+
+
+def check_alerts():
+    """בדוק אם יש התרעות"""
+    try:
+        r = requests.get(OREF_API, timeout=5)
+        data = r.json()
+        return data
+    except Exception as e:
+        print(f"[{now()}] ⚠️  API error: {e}")
+        return None
+
+
+def is_my_area(areas):
+    """האם ההתרעה באזור שלי?"""
+    for area in areas or []:
+        for my_area in ALERT_AREAS:
+            if my_area in area:
+                return True
+    return False
+
+
+def speak(message):
+    """שלח TTS לרמקול HA Voice"""
+    try:
+        r = requests.post(
+            f"{HA_URL}/api/services/tts/cloud_say",
+            headers={
+                "Authorization": f"Bearer {HA_TOKEN}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "entity_id": HA_MEDIA_PLAYER,
+                "message": message,
+                "language": "he-IL"
+            },
+            timeout=10
+        )
+        print(f"[{now()}] 🔊 TTS sent: {r.status_code}")
+    except Exception as e:
+        print(f"[{now()}] ❌ TTS error: {e}")
+
+
+def send_whatsapp(message):
+    """שלח WhatsApp דרך OpenClaw"""
+    if not WHATSAPP_GROUP:
+        return
+    try:
+        r = requests.post(
+            f"{OPENCLAW_URL}/api/send",
+            json={"to": WHATSAPP_GROUP, "message": message},
+            timeout=10
+        )
+        print(f"[{now()}] 📱 WhatsApp sent: {r.status_code}")
+    except Exception as e:
+        print(f"[{now()}] ❌ WhatsApp error: {e}")
+
+
+def now():
+    return datetime.now().strftime("%H:%M:%S")
+
+
+def on_alert(data):
+    """טיפול בהתרעה"""
+    global current_alert_id, last_alert_time
+
+    current = data.get("current", {})
+    alert_id = current.get("id", "")
+    title = current.get("title", "אזעקה")
+    areas = current.get("data", [])
+    desc = current.get("desc", "היכנסו למרחב המוגן")
+
+    # אל תשלח כפילות
+    if alert_id == current_alert_id:
+        return
+    if time.time() - last_alert_time < COOLDOWN_SECONDS:
+        return
+
+    current_alert_id = alert_id
+    last_alert_time = time.time()
+
+    areas_str = ", ".join(areas[:3])
+    print(f"[{now()}] 🚨 ALERT: {title} | {areas_str}")
+
+    # TTS
+    tts_msg = f"אזעקת {title}! אזור: {areas_str}. {desc}"
+    speak(tts_msg)
+
+    # WhatsApp
+    wa_msg = (
+        f"🚨 *אזעקת פיקוד העורף!*\n\n"
+        f"📢 {title}\n"
+        f"📍 {areas_str}\n"
+        f"⏰ {now()}\n\n"
+        f"⚠️ {desc}\n\n"
+        f"🤖 Luky Bot"
+    )
+    send_whatsapp(wa_msg)
+
+
+def on_clear():
+    """סיום התרעה"""
+    global current_alert_id
+    if current_alert_id is None:
+        return
+
+    print(f"[{now()}] ✅ Alert cleared")
+    current_alert_id = None
+    speak("סיום אזעקה. ניתן לצאת מהמרחב המוגן.")
+    send_whatsapp("✅ סיום אזעקה - ניתן לצאת מהמרחב המוגן.")
+
+
+def main():
+    print(f"🚀 ORef Monitor started")
+    print(f"📍 Monitoring: {', '.join(ALERT_AREAS)}")
+    print(f"🔊 Speaker: {HA_MEDIA_PLAYER}")
+    print(f"📡 API: {OREF_API}")
+    print("-" * 40)
+
+    while True:
+        try:
+            data = check_alerts()
+            if data:
+                if data.get("alert") and is_my_area(data.get("current", {}).get("data")):
+                    on_alert(data)
+                else:
+                    on_clear()
+        except Exception as e:
+            print(f"[{now()}] ❌ Error: {e}")
+
+        time.sleep(5)
+
+
+if __name__ == "__main__":
+    main()

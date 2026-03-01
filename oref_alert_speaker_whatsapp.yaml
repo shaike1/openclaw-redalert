@@ -1,0 +1,27 @@
+alias: Oref Alert Notifications
+description: Send ORef alerts to speaker and WhatsApp
+trigger:
+  - platform: state
+    entity_id: sensor.oref_alert_hrtslyh_glyl_ym
+    from: ok
+    to: alert
+  - platform: state
+    entity_id: sensor.oref_alert_hrtslyh_glyl_ym
+    from: pre_alert
+    to: alert
+action:
+  - service: tts.speak
+    target:
+      entity_id: media_player.home_assistant_voice_09a069
+    data:
+      message: '{% set record = state_attr(''sensor.oref_alert_hrtslyh_glyl_ym'', ''record'')
+        %}אזעקת צבע אדום! {{ record.title }}. אזור: {{ record.data }}. היכנסו
+        מיד למרחב מוגן.'
+      language: he
+  - service: whatsapp.send_message
+    data:
+      message: "🚨 **אזעקת צבע אדום - פיקוד העורף**\n\n{% set record = state_attr(''sensor.oref_alert_hrtslyh_glyl_ym'',
+        ''record'') %}\n📢 {{ record.title }}\n📍 אזור: {{ record.data }}\n⏰ זמן: {{
+        record.alertDate }}\n\n⚠️ היכנסו מיד למרחב מוגן!\n\n---\n🤖 Luky Bot"
+      target: 120363417492964228@g.us
+mode: single

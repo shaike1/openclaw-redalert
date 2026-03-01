@@ -1,0 +1,97 @@
+# ======================================================
+# ORef Alerts - Home Assistant Configuration
+# שים קובץ זה ב-/config/packages/oref_alerts.yaml
+# ======================================================
+
+# REST Sensors
+sensor:
+  - platform: rest
+    resource: http://100.64.0.7:49000/current
+    name: oref_alert
+    unique_id: oref_alert_current
+    value_template: 'OK'
+    json_attributes:
+      - alert
+      - current
+    scan_interval: 5
+    timeout: 30
+
+  - platform: rest
+    resource: http://100.64.0.7:49000/history
+    name: oref_alert_history
+    unique_id: oref_alert_history
+    value_template: 'OK'
+    json_attributes:
+      - history
+    scan_interval: 120
+    timeout: 30
+
+# Binary Sensor - כל התראה
+binary_sensor:
+  - platform: template
+    sensors:
+      oref_alert_active:
+        friendly_name: "פיקוד העורף - התרעה פעילה"
+        value_template: >-
+          {{ state_attr('sensor.oref_alert', 'alert') == true }}
+
+# ======================================================
+# Automations
+# ======================================================
+automation:
+
+  # 🔴 התרעה חדשה - הכרזה ורמקול + WhatsApp
+  - alias: "ORef - התרעה חדשה"
+    id: oref_new_alert
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.oref_alert_active
+        from: "off"
+        to: "on"
+    action:
+      # הכרזה ברמקול
+      - service: tts.speak
+        target:
+          entity_id: media_player.home_assistant_voice_09a069
+        data:
+          message: >
+            {%- set current = state_attr('sensor.oref_alert', 'current') -%}
+            {%- set title = current.title if current else 'אזעקה' -%}
+            {%- set areas = current.data | join(', ') if current and current.data else '' -%}
+            אזעקת {{ title }}! אזור: {{ areas }}. היכנסו מיד למרחב המוגן!
+          language: he
+
+      # WhatsApp לקבוצה
+      - delay: "00:00:02"
+      - service: notify.notify
+        data:
+          message: >
+            🚨 *אזעקת פיקוד העורף!*
+
+            {% set current = state_attr('sensor.oref_alert', 'current') %}
+            📢 {{ current.title }}
+            📍 אזור: {{ current.data | join(', ') }}
+            ⏰ {{ now().strftime('%H:%M') }}
+
+            ⚠️ היכנסו מיד למרחב המוגן!
+
+            🤖 Luky Bot
+    mode: single
+
+  # ✅ סיום התרעה
+  - alias: "ORef - סיום התרעה"
+    id: oref_alert_cleared
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.oref_alert_active
+        from: "on"
+        to: "off"
+    action:
+      - delay: "00:00:05"
+      - service: tts.speak
+        target:
+          entity_id: media_player.home_assistant_voice_09a069
+        data:
+          message: "סיום אזעקה. ניתן לצאת מהמרחב המוגן, אך יש להישאר בקרבתו."
+          language: he
+    mode: single

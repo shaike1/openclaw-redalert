@@ -1,0 +1,10 @@
+Host ha-jump
+    HostName 192.168.88.253
+    User root
+    StrictHostKeyChecking no
+
+Host ha-home
+    HostName 100.64.0.14
+    User root
+    ProxyJump ha-jump
+    StrictHostKeyChecking no

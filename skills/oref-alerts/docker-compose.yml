@@ -1,0 +1,41 @@
+version: "3.8"
+
+services:
+  oref-alerts:
+    image: dmatik/oref-alerts:latest
+    container_name: oref-alerts
+    restart: unless-stopped
+    ports:
+      - "49000:9001"
+    environment:
+      TZ: "Asia/Jerusalem"
+
+  oref-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: oref-monitor
+    container_name: oref-monitor
+    restart: unless-stopped
+    depends_on:
+      - oref-alerts
+    environment:
+      # API פיקוד העורף
+      OREF_API_URL: "http://oref-alerts:9001/current"
+      OREF_POLL_INTERVAL: "5"
+      OREF_COOLDOWN: "60"
+
+      # אזורים מנוטרים (הרצליה בלבד)
+      MONITORED_AREAS: "הרצליה,הרצליה - גליל ים ומרכז"
+
+      # WhatsApp
+      WHATSAPP_GROUP_JID: "120363417492964228@g.us"
+      WHATSAPP_OWNER: "+972525173322"
+
+      # Home Assistant
+      HASS_SERVER: "https://ha.right-api.com"
+      HASS_TOKEN: "${HASS_TOKEN}"  # set in .env file (not in git!)
+      HA_TTS_SPEAKER: "media_player.home_assistant_voice_09a069"
+    volumes:
+      - /root/go/bin/wacli:/usr/local/bin/wacli:ro
+      - /root/.wacli:/root/.wacli:ro

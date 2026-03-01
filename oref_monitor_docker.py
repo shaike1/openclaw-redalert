@@ -238,8 +238,8 @@ def dispatch_alert(data: dict):
 
     log.info(f"🚨 [{level}] Dispatching alert")
 
-    # 1️⃣ WhatsApp - רק לסוגים קריטיים (לא לסיום אירוע ולא להתרעה מוקדמת)
-    if level not in ("ALL_CLEAR", "WARNING"):
+    # 1️⃣ WhatsApp - קריטי + סיום אירוע (לא להתרעה מוקדמת)
+    if level not in ("WARNING",):
         send_whatsapp(WHATSAPP_GROUP, wa_msg)
         send_whatsapp(WHATSAPP_OWNER, wa_msg)
 

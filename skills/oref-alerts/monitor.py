@@ -205,14 +205,13 @@ def build_messages(data: dict) -> tuple[str, str, dict]:
     action  = atype["action"]
     now     = datetime.now().strftime("%H:%M:%S")
 
-    # סינון לפי אזורים
+    # סינון לפי אזורים - הצג רק אזורים רלוונטיים
     if MONITORED_AREAS and areas:
         matched = [a for a in areas if any(m in a for m in MONITORED_AREAS)]
-        area_note = f"\n📍 *באזורך:* {', '.join(matched)}" if matched else ""
-        all_areas = f"\n📍 כל האזורים: {', '.join(areas[:8])}"
-        areas_str = area_note + all_areas
+        areas_to_show = matched if matched else areas[:8]
     else:
-        areas_str = f"\n📍 {', '.join(areas[:8])}" if areas else ""
+        areas_to_show = areas[:8]
+    areas_str = f"\n📍 {', '.join(areas_to_show)}" if areas_to_show else ""
 
     desc_str = f"\n📋 {desc}" if desc else ""
 
@@ -239,9 +238,10 @@ def dispatch_alert(data: dict):
 
     log.info(f"🚨 [{level}] Dispatching alert")
 
-    # 1️⃣ WhatsApp (תמיד)
-    send_whatsapp(WHATSAPP_GROUP, wa_msg)
-    send_whatsapp(WHATSAPP_OWNER, wa_msg)
+    # 1️⃣ WhatsApp - רק לסוגים קריטיים (לא לסיום אירוע ולא להתרעה מוקדמת)
+    if level not in ("ALL_CLEAR", "WARNING"):
+        send_whatsapp(WHATSAPP_GROUP, wa_msg)
+        send_whatsapp(WHATSAPP_OWNER, wa_msg)
 
     # 2️⃣ TTS + אורות
     ha_tts(tts_text)

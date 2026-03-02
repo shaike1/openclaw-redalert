@@ -275,8 +275,10 @@ def check_alert():
     try:
         resp = requests.get(OREF_API, timeout=5)
         data = resp.json()
+        self_check_api(True)
     except Exception as e:
         log.warning(f"⚠️ API: {e}")
+        self_check_api(False)
         return
 
     is_alert = data.get("alert", False)
@@ -322,6 +324,43 @@ def check_alert():
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Self-checks
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def self_check_heartbeat():
+    """Send a daily 'still alive' message to the WhatsApp group."""
+    global last_heartbeat_at
+    now = time.time()
+    if last_heartbeat_at and (now - last_heartbeat_at) < HEARTBEAT_INTERVAL:
+        return
+    last_heartbeat_at = now
+    areas = ", ".join(MONITORED_AREAS) if MONITORED_AREAS else "כל הארץ"
+    msg = f"💓 ORef monitor פעיל\n📍 מנטר: {areas}\n🕐 {datetime.now().strftime('%d/%m %H:%M')}"
+    log.info("💓 Sending heartbeat")
+    send_whatsapp(WHATSAPP_GROUP, msg)
+
+
+def self_check_api(api_ok: bool):
+    """Alert if the API has been unreachable for too long."""
+    global api_fail_since, api_fail_alerted
+    if api_ok:
+        if api_fail_since:
+            log.info("✅ API back online")
+            if api_fail_alerted:
+                send_whatsapp(WHATSAPP_GROUP, "✅ ORef API חזר לפעולה")
+        api_fail_since = None
+        api_fail_alerted = False
+        return
+    now = time.time()
+    if api_fail_since is None:
+        api_fail_since = now
+    elapsed = now - api_fail_since
+    if elapsed >= API_FAIL_ALERT_AFTER and not api_fail_alerted:
+        api_fail_alerted = True
+        log.error(f"❌ API unreachable for {int(elapsed)}s — alerting")
+        send_whatsapp(WHATSAPP_GROUP, f"⚠️ ORef API לא מגיב כבר {int(elapsed//60)} דקות! בדקו את השירות.")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def main():
     log.info("🚀 ORef Smart Monitor v2 started")
     log.info(f"📡 API: {OREF_API} | poll: {POLL_INTERVAL}s")
@@ -331,10 +370,16 @@ def main():
     log.info(f"📍 Monitored areas: {MONITORED_AREAS or 'כל הארץ'}")
     log.info("━" * 50)
     log.info("Alert levels: 🚀cat=1 ✈️cat=2 🔴cat=10 | ⚠️cat=14 pre-alert | ✅cat=13 all-clear")
+    log.info(f"💓 Heartbeat every {HEARTBEAT_INTERVAL//3600}h | API fail alert after {API_FAIL_ALERT_AFTER}s")
+
+    # Startup notification
+    areas = ", ".join(MONITORED_AREAS) if MONITORED_AREAS else "כל הארץ"
+    send_whatsapp(WHATSAPP_GROUP, f"✅ ORef monitor הופעל\n📍 מנטר: {areas}")
 
     while True:
         try:
             check_alert()
+            self_check_heartbeat()
         except Exception as e:
             log.error(f"❌ Error: {e}")
         time.sleep(POLL_INTERVAL)
